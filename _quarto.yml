@@ -1,0 +1,19 @@
+project:
+  type: default
+  output-dir: output
+
+execute:
+  echo: false
+  warning: false
+  message: false
+
+format:
+  pdf:
+    pdf-engine: xelatex
+    documentclass: article
+    papersize: a4
+    fontsize: 11pt
+    geometry: margin=2.5cm
+    number-sections: true
+    toc: true
+    mainfont: Latin Modern Roman

@@ -1,0 +1,932 @@
+---
+title: "Nonlinear Time Series Analysis of Sovereign Bond Yield Spreads"
+subtitle: "Australian and Spanish bonds compared to Germany in terms of yields."
+author:
+  - "AL AFIA Ramzi"
+  - "NOWICKI Yann"
+  - "OUEDRAOGO Paligwende"
+format: pdf
+editor: visual
+---
+
+# Introduction
+
+```{r}
+#| echo: false
+#| include: false
+library(tidyverse)
+bondsxl = readxl::read_xls("./data/base_bond_equity.xls", sheet = "Bonds")
+```
+
+```{r}
+#| echo: false
+bond10_at = bondsxl[,7:8] # Autriche
+bond10_de = bondsxl[,15:16] # Allemagne
+bond10_sp = bondsxl[,39:40] # Espagne
+```
+
+```{r}
+#| echo: false
+#| message: false
+# Exemple de code manuellement écrit pour la colonne `France 5 Year` : on choisit d'automatiser en créant une fonction de conversion.
+
+# db5fr  = bond5_fr$Date...1 # Date b5fr
+
+# vb5fr = bond5_fr$`France, Government Benchmarks, Macrobond, 5 Year, Yield` # Values b5fr
+
+#cb5fr = !is.na(db5fr) & !is.na(vb5fr) # Cleaned b5fr
+
+#b5fr = xts(x = vb5fr[cb5fr],order.by = db5fr[cb5fr])
+
+library(xts)
+
+auto_xts = function(dates, values) {
+  valid = !is.na(dates) & !is.na(values)
+  xts(
+    x = values[valid],
+    order.by = dates[valid]
+  )
+}
+```
+
+```{r}
+#| echo: false
+b10at = auto_xts(bond10_at$Date...7, bond10_at$`Austria, Government Benchmarks, Macrobond, 10 Year, Yield`)
+b10de = auto_xts(bond10_de$Date...15, bond10_de$`Germany, Government Benchmarks, Macrobond, 10 Year, Yield`)
+b10sp = auto_xts(bond10_sp$Date...39, bond10_sp$`Spain, Government Benchmarks, Macrobond, 10 Year, Yield`)
+bonds10 = list(AT = b10at, DE = b10de, ES = b10sp)
+
+# Pour les besoins de l'exercice :
+# - On se focalise sur les yields bonds de 10 ans.
+# - On fait le choix de la paire de bonds : Autriche - Espagne.
+# - La référence du spread est le bond allemand.
+
+spread_at_de = bonds10$AT - bonds10$DE
+spread_sp_de = bonds10$ES - bonds10$DE
+colnames(spread_at_de) = "AT_DE_10Y"
+colnames(spread_sp_de) = "ES_DE_10Y"
+```
+
+```{r}
+#| echo: false
+#| message: false
+library(zoo)
+library(tsibble)
+library(tibble)
+
+spreads = merge(
+  AT_DE = spread_at_de,
+  ES_DE = spread_sp_de,
+  join = "inner"   # intersection des dates communes
+)
+
+spreads = spreads[order(zoo::index(spreads))]
+
+spreads_ts = tibble(
+  date  = as.Date(zoo::index(spreads)),
+  AT_DE = as.numeric(spreads$AT_DE),
+  ES_DE = as.numeric(spreads$ES_DE)
+) %>%
+  as_tsibble(index = date, regular = FALSE)
+```
+
+```{r}
+#| echo: false
+#| message: false
+library(ggplot2)
+
+ggAT_DE = spreads_ts %>%
+  ggplot(aes(date, AT_DE)) +
+  geom_line() +
+  labs(
+    title = "Austria–Germany 10-Year Yield Spread",
+    x = "Date",
+    y = "Yield spread (pp)"
+  ) +
+  theme_minimal()
+
+ggES_DE = spreads_ts %>%
+  ggplot(aes(date, ES_DE)) +
+  geom_line() +
+  labs(
+    title = "Spain–Germany 10-Year Yield Spread",
+    x = "Date",
+    y = "Yield spread (pp)"
+  ) +
+  theme_minimal()
+
+ggboth = spreads_ts %>%
+  pivot_longer(
+    cols = c(AT_DE, ES_DE),
+    names_to = "Spread",
+    values_to = "Value"
+  ) %>%
+  ggplot(aes(date, Value, color = Spread)) +
+  geom_line() +
+  labs(
+    title = "10-Year Sovereign Yield Spreads Relative to Germany",
+    x = "Date",
+    y = "Yield spread (pp)"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| warning: false
+#| echo: false
+# Pour afficher les vecteurs mais peut-être utilisé un meilleur package de visualisation colonne.
+
+SPRAUS = spread_at_de
+SPRES = spread_sp_de
+```
+
+# Exploratory data analysis
+
+## Presentation of the data
+
+### Data description
+
+### Feature engineering
+
+### Moments of the data
+
+```{r}
+#| echo: false
+#| warning: false
+
+library(xts)
+library(knitr)
+
+df = merge(
+  SPRAUS,
+  SPRES,
+  join = "inner"
+)
+
+colnames(df) = c(
+  "Austrian yield spread",
+  "Spanish yield spread"
+)
+
+head(df, 20) |>
+  as.data.frame() |>
+  kable(booktabs = TRUE)
+```
+
+Le **spread** de rendement obligataire entre une **obligation autrichienne** et une obligation allemande de 10 ans, considéré comme proxy du taux sans risque, en pourcentage :
+
+$$ Y_{\text{Austria},t}^S $$
+
+```{r}
+#| echo: false
+ggAT_DE # Graphique pour le spread de rendement autrichien.
+```
+
+Le **spread** de rendement obligataire entre une **obligation espagnole** et une obligation allemande de 10 ans, considéré comme proxy du taux sans risque, en pourcentage :
+
+$$
+Y_{\text{Spain},t}^S
+$$
+
+```{r}
+#| echo: false
+ggES_DE
+```
+
+```{r}
+#| echo: false
+library(moments)
+
+stats_tableAUS = cbind(
+  Mean     = colMeans(SPRAUS),
+  SD       = apply(SPRAUS, 2, sd),
+  Skewness = apply(SPRAUS, 2, skewness),
+  Kurtosis = apply(SPRAUS, 2, kurtosis)
+)
+
+stats_tableES = cbind(
+  Mean     = colMeans(SPRES),
+  SD       = apply(SPRES, 2, sd),
+  Skewness = apply(SPRES, 2, skewness),
+  Kurtosis = apply(SPRES, 2, kurtosis)
+)
+```
+
+```{r}
+#| echo: false
+
+knitr::kable(
+  stats_tableAUS,
+  digits = 3,
+  caption = "Descriptive statistics – Austria (spread vs Germany)"
+)
+```
+
+```{r}
+#| echo: false
+knitr::kable(
+  stats_tableES,
+  digits = 3,
+  caption = "Descriptive statistics – Spain (spread vs Germany)"
+)
+```
+
+## Visualisation of the data
+
+### Time series dynamics
+
+### Returns empirical distributions shapes
+
+### Detection of asymmetry and outliers
+
+### Verifying normality assumptions
+
+#### Tails
+
+#### Body
+
+### Persistence and memory effects
+
+```{r}
+#| echo: false
+#| message: false
+
+# Créer les plots pour visualiser l'histogramme de la distribution des spreads.
+
+distroAUS = ggplot2::ggplot(SPRAUS, aes(x = SPRAUS)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 75,
+                 fill = "blue",
+                 alpha = 0.6) +
+  geom_density(color = "red", linewidth = 1) +
+  labs(title = "Austria-Deutschland Spread",
+       x = "Spread returns",
+       y = "Density")
+
+distroAUS
+```
+
+```{r}
+#| echo: false
+#| message: false
+
+distroES = ggplot2::ggplot(SPRES, aes(x = SPRES)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 75,
+                 fill = "skyblue",
+                 alpha = 0.6) +
+  geom_density(color = "orange", linewidth = 1) +
+  labs(title = "Spain-Deutschland Spread",
+       x = "Spread returns",
+       y = "Density")
+distroES
+```
+
+```{r}
+#| echo: false
+oldpar = par(no.readonly = TRUE)
+on.exit(par(oldpar), add = TRUE)
+
+par(mar = c(5, 4, 6, 2) + 0.1)  # augmente la marge en haut
+
+qqnorm(
+  SPRAUS,
+  main = "QQ-plot – Spread autrichien",
+  xlab = "Quantiles théoriques",
+  ylab = "Quantiles empiriques"
+)
+
+qqline(SPRAUS, col = "red", lwd = 2)
+
+mtext(
+  "QQ-plot des rendements (référence : loi normale centrée réduite)",
+  side = 3, line = 4.5, cex = 0.9
+)
+```
+
+```{r}
+#| echo: false
+oldpar = par(no.readonly = TRUE)
+on.exit(par(oldpar), add = TRUE)
+
+par(mar = c(5, 4, 6, 2) + 0.1) 
+
+qqnorm(SPRES,
+       main = "QQ-plot – Spread espagnol",
+       xlab = "Quantiles théoriques",
+       ylab = "Quantiles empiriques")
+
+qqline(SPRES, col = "blue", lwd = 2)
+
+mtext(
+  "QQ-plot des rendements (référence : loi normale centrée réduite)",
+  side = 3, line = 4.5, cex = 0.9
+)
+```
+
+```{r}
+#| echo: false
+boxplot(SPRAUS,main = "Boxplots of Austrian spreads", col = c("lightblue"))
+```
+
+```{r}
+#| echo: false
+boxplot(SPRES,main = "Boxplots of Spanish spreads", col = c("lightpink"))
+```
+
+```{r}
+#| echo: false
+
+library(xts)
+library(tibble)
+
+# Avoir deux vecteurs de même taille
+Z_xts = merge(AUS = SPRAUS, ES  = SPRES, join = "inner")
+colnames(Z_xts) = c("AUS", "ES")
+
+Z = tibble(AUS = as.numeric(Z_xts$AUS), ES  = as.numeric(Z_xts$ES))
+
+library(ggplot2)
+
+ggplot(Z, aes(x = AUS, y = ES)) +
+  geom_point(alpha = 0.6) +
+  theme_minimal() +
+  labs(
+    title = "Scatterplot AUS vs ES spreads",
+    x = "AUS spread",
+    y = "ES spread")
+```
+
+```{r}
+#| echo: false
+par(mfrow = c(1,1))
+acf(Z$AUS, main = "Autocorrelation function for Austrian spread returns")
+acf(Z$ES, main = "Autocorrelation function for Spanish spread returns")
+```
+
+```{r}
+#| echo: false
+par(mfrow = c(1,1))
+acf(Z$AUS^2, main = "ACF for squared Austrian spread returns")
+acf(Z$ES^2, main = "ACF for squared Spanish spread returns")
+```
+
+```{r}
+#| echo: false
+library(goftest)
+
+x = na.omit(Z$AUS)
+
+plot(
+  ppoints(length(x)),
+  ecdf(x)(sort(x)),
+  xlab = "F théorique",
+  ylab = "F empirique",
+  main = "PP-plot Austrian Spread Returns"
+)
+
+abline(0, 1, col = "red")
+
+y = na.omit(Z$ES)
+
+plot(ppoints(length(y)), 
+     ecdf(y)(sort(y)),
+     xlab = "F théorique", 
+     ylab = "F empirique",
+     main = "PP-plot Spanish Spread Returns")
+
+abline(0,1,col="red")
+```
+
+# Inference with asymmetric and heavy-tailed distributions
+
+## Non-normality hypothesis and consequences
+
+## Feature engineering onto magnitude size view
+
+## Fitting asymmetric distributions
+
+## AIC/Log-likelihood-based model selection
+
+## Model adequacy and goodness-of-fit diagnostics
+
+## Robustness and threshold sensibility analysis
+
+```{r}
+#| echo: false
+xT_AUS = abs(as.numeric(Z$AUS))
+xT_ES = abs(as.numeric(Z$ES))
+
+xT_AUS = xT_AUS[is.finite(xT_AUS) & xT_AUS > 0]
+xT_ES = xT_ES[is.finite(xT_ES) & xT_ES > 0]
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| results: false
+#| include: false
+fit_logn_AUS = fitdistrplus::fitdist(xT_AUS, "lnorm")
+fit_gamma_AUS = fitdistrplus::fitdist(xT_AUS, "gamma")
+fit_weibull_AUS = fitdistrplus::fitdist(xT_AUS, "weibull")
+
+fit_logn_ES = fitdistrplus::fitdist(xT_ES, "lnorm")
+fit_gamma_ES = fitdistrplus::fitdist(xT_ES, "gamma")
+fit_weibull_ES = fitdistrplus::fitdist(xT_ES, "weibull")
+```
+
+```{r}
+#| echo: false
+aic_AUS = c(
+  LogNormal = AIC(fit_logn_AUS),
+  Gamma     = AIC(fit_gamma_AUS),
+  Weibull   = AIC(fit_weibull_AUS)
+)
+
+best_AIC_AUS = names(which.min(aic_AUS))
+
+aic_ES = c(
+  LogNormal = AIC(fit_logn_ES),
+  Gamma     = AIC(fit_gamma_ES),
+  Weibull   = AIC(fit_weibull_ES)
+)
+
+best_AIC_ES = names(which.min(aic_ES))
+
+
+loglik_AUS = c(LogNormal = fit_logn_AUS$loglik,
+                 Gamma     = fit_gamma_AUS$loglik,
+                 Weibull   = fit_weibull_AUS$loglik)
+
+loglik_ES = c(LogNormal = fit_logn_ES$loglik,
+                 Gamma     = fit_gamma_ES$loglik,
+                 Weibull   = fit_weibull_ES$loglik)
+
+best_LL_ES = names(which.max(loglik_ES))
+best_LL_AUS = names(which.max(loglik_AUS))
+```
+
+```{r}
+#| echo: false
+# The best model onto both criteria
+
+best_model_two_criteria <- function(aic, loglik) {
+  stopifnot(all(names(aic) == names(loglik)))
+
+  best_aic <- names(which.min(aic))
+  best_ll  <- names(which.max(loglik))
+
+  # Cas 1 : même gagnant sur les deux critères
+  if (best_aic == best_ll) return(best_aic)
+
+  # Cas 2 : compromis (normalisation)
+  # AIC: plus petit = mieux → on mesure l'écart relatif au meilleur (min)
+  aic_gap <- (aic - min(aic)) / abs(min(aic))
+
+  # LogLik: plus grand = mieux → on mesure la perte relative vs meilleur (max)
+  ll_gap  <- (max(loglik) - loglik) / abs(max(loglik))
+
+  score <- aic_gap + ll_gap
+  names(which.min(score))
+}
+```
+
+```{r}
+#| echo: false
+best_BOTH_AUS <- best_model_two_criteria(aic_AUS, loglik_AUS)
+best_BOTH_ES  <- best_model_two_criteria(aic_ES,  loglik_ES)
+
+cat("\nBest model considering AIC & Log-Likelihood — AUS:\n")
+print(best_BOTH_AUS)
+
+cat("\nBest model considering AIC & Log-Likelihood — ES:\n")
+print(best_BOTH_ES)
+```
+
+```{r}
+#| echo: false
+par(mfrow = c(1,1))
+
+hist(xT_AUS, breaks = 15,
+     main = "Austrian returns magnitude – Austria",
+     col = "grey")
+
+hist(xT_ES, breaks = 15,
+     main = "Spanish spread returns magnitude – Spain",
+     col = "grey")
+```
+
+```{r}
+#| echo: false
+par(mfrow = c(1,1))
+
+plot(fit_logn_AUS)
+plot(fit_logn_ES) 
+
+fitdistrplus::ppcomp(fit_logn_AUS)
+fitdistrplus::qqcomp(fit_logn_AUS)
+fitdistrplus::denscomp(fit_logn_AUS)
+fitdistrplus::cdfcomp(fit_logn_AUS)
+```
+
+```{r}
+#| echo: false
+#| include: false
+length(Z$AUS)
+length(Z$ES)
+```
+
+```{r}
+#| echo: false
+return_AUS = Z$AUS
+
+loss_AUS = - return_AUS
+
+loss_AUS = loss_AUS[loss_AUS > 0] # On ne prend que les valeurs non nulles
+
+hist(loss_AUS, probability = TRUE, main = "Histogram of loss (Austrian spread)", xlab = "Pertes")
+
+lines(density(loss_AUS), col = "red", lwd = 2)
+  
+return_ES = Z$ES
+
+loss_ES = - return_ES
+
+loss_ES = loss_ES[loss_ES > 0]
+
+hist(loss_ES, probability = TRUE, main = "Histogram of loss (Spanish spread)", xlab = "Pertes")
+
+lines(density(loss_ES), col = "red", lwd = 2)
+```
+
+## Threshold selection
+
+```{r}
+#| echo: false
+#| include: false
+threshold_AUS = quantile(loss_AUS, 0.85) # 15% des pires pertes
+
+threshold_ES = quantile(loss_ES, 0.85)
+
+library(evd)
+
+fitGPD_AUS = fpot(loss_AUS, threshold = threshold_AUS, std.err = FALSE) 
+fitGPD_ES = fpot(loss_ES, threshold = threshold_ES, std.err = FALSE)
+
+fitGPD_AUS
+fitGPD_ES
+```
+
+```{r}
+#| echo: false
+#| include: false
+# Extraction du paramètre de forme de la distribution fitté du spread autrichien
+
+shape_pareto_AUS = fitGPD_AUS$estimate["shape"]
+
+# Extraction du paramètre de forme de la distribution fitté du spread espagnol
+
+shape_pareto_ES = fitGPD_ES$estimate["shape"]
+
+# Extraction du paramètre d'échelle de la distribution fitté 
+
+scale_pareto_AUS = fitGPD_AUS$estimate["scale"]
+
+# Extraction du paramètre d'échelle de la distribution fitté 
+
+scale_pareto_ES = fitGPD_ES$estimate["scale"]
+
+```
+
+## Generalized Pareto Distribution estimation
+
+```{r}
+#| echo: false
+cat(
+  "Paramètres estimés (GPD)\n",
+  "\nAutriche :",
+  "\n  - Shape :", round(shape_pareto_AUS, 4),
+  "\n  - Scale :", round(scale_pareto_AUS, 4),
+  "\n\nEspagne :",
+  "\n  - Shape :", round(shape_pareto_ES, 4),
+  "\n  - Scale :", round(scale_pareto_ES, 4)
+)
+```
+
+## Model validation
+
+```{r}
+#| echo: false
+#| fig-cap: "QQ-plot de l’ajustement GPD (Autriche)"
+#| fig-width: 6
+#| fig-height: 6
+
+plot(fitGPD_AUS, which = 2,
+     main = "Generalized Pareto Distribution – Austria")
+```
+
+```{r}
+#| echo: false
+#| fig-cap: "QQ-plot de l’ajustement GPD (Espagne)"
+#| fig-width: 6
+#| fig-height: 6
+
+
+plot(fitGPD_ES, which = 2,
+     main = "Generalized Pareto Distribution – Spain")
+```
+
+## Robustness analysis
+
+```{r}
+
+# On réapplique la même chose sauf qu'on change le seuil pour tester la robustesse du fitting.
+
+
+```
+
+# Dependences
+
+## Linear dependence
+
+## Non-linear dependence
+
+### Copula theory
+
+### Pseudo-observations
+
+### Copula specification and dependence structures
+
+## Copula inference
+
+### Fitting copula
+
+### Model comparison
+
+## Tail dependence
+
+```{r}
+#| include: false
+#| message: false
+
+library(copula)
+
+X = cbind(AUS = return_AUS, ES = return_ES)
+
+U = pobs(X)
+```
+
+```{r}
+#| echo: false
+
+plot(U[,1], U[,2],
+     pch = 16, cex = 0.5, col = "steelblue",
+     xlab = "U_AUS", ylab = "U_ES",
+     main = "Pseudo-observations (excess returns)")
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| include: false
+
+
+normalcop = normalCopula(param = 0.3, dim = 2)
+
+normalcopfitted = suppressWarnings(fitCopula(copula = normalcop, data = U, method = "ml"))
+
+tcop = tCopula(param = 0.3, dim = 2, df = 4)
+
+tcopfitted = suppressWarnings(fitCopula(copula = tcop, data = U, method = "ml"))
+```
+
+```{r}
+#| echo: false
+claytoncop = claytonCopula(param = 1, dim = 2)
+
+claytoncopfitted = fitCopula(copula = claytoncop, data = U, method = "ml")
+
+gumbelcop = gumbelCopula(param = 1.2, dim = 2)
+
+gumbelcopfitted = fitCopula(copula = gumbelcop, data = U, method = "ml")
+```
+
+```{r}
+#| echo: false
+#| tbl-cap: "Comparaison des critères AIC des copules estimées"
+
+library(tibble)
+library(knitr)
+
+tibble(
+  Copule = c("t-copule", "Copule normale"),
+  AIC    = round(c(AIC(tcopfitted), AIC(normalcopfitted)), 2)
+) |>
+  knitr::kable(
+    format = "latex",
+    booktabs = TRUE,
+    align = "lc"
+  )
+```
+
+```{r}
+#| echo: false
+#| tbl-cap: "Mesures empiriques de dépendance"
+
+library(tibble)
+library(knitr)
+
+tibble(
+  Mesure = c("Corrélation de Pearson",
+             "Tau de Kendall",
+             "Rho de Spearman"),
+  Valeur = round(c(
+    cor(X, method = "pearson")[1, 2],
+    cor(X, method = "kendall")[1, 2],
+    cor(X, method = "spearman")[1, 2]
+  ), 4)
+) |>
+  knitr::kable(
+    format = "latex",
+    booktabs = TRUE,
+    align = "lc"
+  )
+```
+
+```{r}
+#| echo: false
+#| tbl-cap: "Dépendance implicite (Kendall $\\tau$) des copules estimées"
+
+tibble(
+  Copule = c("Normale", "t", "Clayton", "Gumbel"),
+  Tau    = round(c(
+    tau(normalcopfitted@copula),
+    tau(tcopfitted@copula),
+    tau(claytoncopfitted@copula),
+    tau(gumbelcopfitted@copula)
+  ), 4)
+) |>
+  knitr::kable(
+    format = "latex",
+    booktabs = TRUE,
+    align = "lc"
+  )
+```
+
+```{r}
+#| echo: false
+#| tbl-cap: "Coefficients de dépendance de queue des copules"
+
+tibble(
+  Copule = c("t", "Clayton", "Gumbel"),
+  Lambda_inf = round(c(
+    lambda(tcopfitted@copula)["lower"],
+    lambda(claytoncopfitted@copula)["lower"],
+    NA
+  ), 4),
+  Lambda_sup = round(c(
+    lambda(tcopfitted@copula)["upper"],
+    NA,
+    lambda(gumbelcopfitted@copula)["upper"]
+  ), 4)
+) |>
+  knitr::kable(
+    format = "latex",
+    booktabs = TRUE,
+    align = "lcc"
+  )
+```
+
+# Conclusion
+
+```{r}
+Y = Z$AUS
+X = Z$ES
+```
+
+```{r}
+adf.test(Y)
+adf.test(X)
+```
+
+```{r}
+CAPM = lm(Y ~ X)
+
+summary(CAPM)
+```
+
+```{r}
+CAPM_diff = lm(diff(Y) ~ diff(X))
+
+summary(CAPM_diff)
+```
+
+```{r}
+epsilon = residuals(CAPM)
+```
+
+```{r}
+plot(epsilon, type = "l", main = "Residuals from Linear CAPM", ylab = "Residuals", xlab = "Time")
+```
+
+```{r}
+Box.test(epsilon, lag = 12, type = "Ljung-Box")
+Box.test(epsilon^2, lag = 20, type = "Ljung-Box")
+```
+
+```{r}
+qqnorm(epsilon)
+qqline(epsilon)
+```
+
+```{r}
+library(lmtest)
+resettest(CAPM, power = 2:3, type = "fitted")
+```
+
+```{r}
+#| message: false
+library(nonlinearTseries)
+keenanTest(epsilon)
+```
+
+```{r}
+tsayTest(epsilon)
+```
+
+```{r}
+#| message: false
+library(tseries)
+bds.test(epsilon)
+```
+
+```{r}
+nonlinearityTest(epsilon,verbose = TRUE)
+```
+
+```{r}
+library(stats)
+library(xts)
+
+lagged_CAPM = lm(Y ~ X + lag.xts(X, k = 1))
+  
+twice_lagged_CAPM = lm(Y ~ X + lag.xts(X, k = 1) + lag.xts(X, k = 2))
+```
+
+```{r}
+IC = data.frame(
+  p   = c(0, 1, 2),
+  AIC = c(AIC(CAPM), AIC(lagged_CAPM), AIC(twice_lagged_CAPM)),
+  BIC = c(BIC(CAPM), BIC(lagged_CAPM), BIC(twice_lagged_CAPM))
+)
+
+IC
+```
+
+```{r}
+library(MSwM)
+markov = msmFit(CAPM, k = 2, sw = c(TRUE, TRUE, TRUE), control = list(parallel=FALSE))
+
+summary(markov)
+```
+
+```{r}
+intervals(markov)
+```
+
+```{r}
+plotDiag(markov, which=1)
+plotDiag(markov, which=3)
+plotDiag(markov, which=2)
+plotDiag(markov, regime=1, which=1)
+plotDiag(markov, regime=1,which=3)
+plotDiag(markov, regime = 1, which=2)
+```
+
+```{r}
+meps = msmResid(markov)
+nonlinearityTest(meps, verbose = TRUE)
+```
+
+```{r}
+plotProb(markov,which=2)
+plotProb(markov, which=3)
+```
+
+```{r}
+#| message: false
+#| error: false
+plotProb(markov, which=3)
+```
+
+```{r}
+plotReg(markov, regime = 1)
+```
+
+```{r}
+plotReg(markov, regime = 2)
+```
+
+```{r}
+
+```

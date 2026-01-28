@@ -1,0 +1,114 @@
+packages:
+
+  # --------------------------------------------------
+  # Core R
+  # --------------------------------------------------
+  core:
+    - base
+    - stats
+    - knitr
+
+  # --------------------------------------------------
+  # Data manipulation & workflow
+  # --------------------------------------------------
+  data:
+    - data.table
+    - readxl
+    - rio
+    - naniar
+
+  # --------------------------------------------------
+  # Time index & time series containers
+  # --------------------------------------------------
+  time_objects:
+    - zoo
+    - xts
+    - tsibble
+
+  # --------------------------------------------------
+  # Visualization
+  # --------------------------------------------------
+  visualization:
+    - ggthemes
+    - plotly
+    - ggvis
+    - dygraphs
+    - scatterplot3d
+    - grid
+    - gridExtra
+
+  # --------------------------------------------------
+  # Statistical diagnostics
+  # --------------------------------------------------
+  diagnostics:
+    - car
+    - lmtest
+    - moments
+    - PerformanceAnalytics
+
+  # --------------------------------------------------
+  # Linear time series models
+  # --------------------------------------------------
+  linear_ts:
+    - forecast
+    - tseries
+    - FinTS
+    - quantmod
+
+  # --------------------------------------------------
+  # Nonlinear & regime-switching models
+  # --------------------------------------------------
+  nonlinear_ts:
+    - tsDyn
+    - vars
+    - MSwM
+    - MSGARCH
+    - depmixS4
+    - nonlinearTseries
+
+  # --------------------------------------------------
+  # Distribution fitting
+  # --------------------------------------------------
+  distributions:
+    - MASS
+    - fitdistrplus
+    - logspline
+    - locfit
+
+  # --------------------------------------------------
+  # Extreme Value Theory
+  # --------------------------------------------------
+  extremes:
+    - extRemes
+    - evd
+    - ismev
+
+  # --------------------------------------------------
+  # Copulas & multivariate dependence
+  # --------------------------------------------------
+  copulas:
+    - copula
+    - mvtnorm
+    - mnormt
+    - sn
+
+  # --------------------------------------------------
+  # Long memory & fractional processes
+  # --------------------------------------------------
+  long_memory:
+    - fracdiff
+    - arfima
+    - longmemo
+
+  # --------------------------------------------------
+  # Volatility models
+  # --------------------------------------------------
+  volatility:
+    - fGarch
+
+
+
+ # ---
+ # Formatting
+ format:
+ - kableExtra
